@@ -1,0 +1,14 @@
+[package]
+name = "kmer-counter"
+version = "0.1.0"
+authors = ["Claudia C. Weber"]
+edition = "2018"
+
+[dependencies]
+needletail = "0.4"
+fnv = "1.0.7"
+clap = ""
+
+ndarray-npy = "0.8"
+ndarray = "0.15.0"
+itertools = "0.10.0"
