@@ -18,7 +18,7 @@ Rust (see https://www.rust-lang.org/tools/install)
 
 - needletail = "0.4"
 - fnv = "1.0.7"
-- clap = ""
+- clap = "2.33"
 - ndarray-npy = "0.8"
 - ndarray = "0.15.0"
 - itertools = "0.10.0"
