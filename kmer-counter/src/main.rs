@@ -1,16 +1,17 @@
 extern crate needletail;
-use clap::{App, Arg};
+use clap::{Command, Arg};
 use fnv::FnvHashMap;
 use needletail::{parse_fastx_file, Sequence};
 use std::error::Error;
 use std::io::prelude::*;
-use std::io::BufWriter;
+use std::io::{BufWriter};//,Seek,SeekFrom
 use std::fs::File;
 use std::str;
 use itertools::Itertools;
 
-use ndarray_npy::write_npy;
-use ndarray::prelude::*;
+use mktemp::Temp;
+
+//use genawaiter::{stack::let_gen, yield_};
 
 fn cartesian_product(list: &Vec<u8>, n: i32) -> Vec<Vec<u8>> {
     let mut res = vec![];
@@ -32,6 +33,8 @@ fn cartesian_product(list: &Vec<u8>, n: i32) -> Vec<Vec<u8>> {
     res
 }
 
+// Get reverse complement of kmers
+// Unicode: A -> 65, C -> 67, G -> 71, T -> 84
 fn rev_comp(kmer: &Vec<u8>) -> Vec<u8> {
     let comp: std::collections::HashMap<_, _> = [(65, 84), (84, 65), (67, 71), (71, 67)].iter().cloned().collect();
     let mut k = kmer.clone();
@@ -39,65 +42,91 @@ fn rev_comp(kmer: &Vec<u8>) -> Vec<u8> {
     k.iter().map(|x| comp[x]).collect::<Vec<_>>()
 }
 
-/// Converts nested `Vec`s to a 2-D array by cloning the elements.
-///
-/// **Panics** if the length of any axis overflows `isize`, if the
-/// size in bytes of all the data overflows `isize`, or if not all the
-/// rows have the same length.
-fn vec_to_array<T: Clone>(v: Vec<Vec<T>>) -> Array2<T> {
-    if v.is_empty() {
-        return Array2::from_shape_vec((0, 0), Vec::new()).unwrap();
-    }
-    let nrows = v.len();
-    let ncols = v[0].len();
-    let mut data = Vec::with_capacity(nrows * ncols);
-    for row in &v {
-        assert_eq!(row.len(), ncols);
-        data.extend_from_slice(&row);
-    }
-    Array2::from_shape_vec((nrows, ncols), data).unwrap()
+
+fn create_header(_nrows: i32, _ncols: usize) -> Vec<u8> {
+    let mut header: Vec<u8> = vec![];
+    header.extend(&b"{'descr': "[..]);
+    header.extend("\'<i4\'".to_string().as_bytes());
+    header.extend(&b", 'fortran_order': False, 'shape': "[..]);
+    //let shape_pos = header.len() + 10;
+    let shape = format!("{:?}", (_nrows,_ncols));
+    header.extend(shape.as_bytes());
+    //header.extend(FILLER);
+    header.extend(&b"}"[..]);
+    header
+    //(header, shape_pos)
 }
 
+
+fn write_header(_nrows: i32, _ncols: usize, out: &str, tmp_path: mktemp::Temp) -> std::io::Result<()> {
+    let mut fw = BufWriter::new(File::create(&out)?);
+    fw.write_all(&[0x93u8])?;
+    fw.write_all(b"NUMPY")?;
+    fw.write_all(&[0x01u8, 0x00])?;
+
+    let header = create_header(_nrows, _ncols); //let (header, shape_pos)
+
+    let mut padding: Vec<u8> = vec![];
+    padding.extend(&::std::iter::repeat(b' ').take(15 - ((header.len() + 10) % 16)).collect::<Vec<_>>());
+    padding.extend(&[b'\n']);
+
+    let len = header.len() + padding.len();
+    assert! (len <= ::std::u16::MAX as usize);
+    assert_eq!((len + 10) % 16, 0);
+
+    fw.write_all(&(len as u16).to_le_bytes())?;
+    fw.write_all(&header)?;
+    // Padding to 8 bytes
+    fw.write_all(&padding)?;
+    fw.flush()?;
+
+    let mut bin_src = File::open(&tmp_path)?;
+    std::io::copy(&mut bin_src, &mut fw)?;
+
+    Ok(())
+}
+
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("K-mer counter")
-        .version("0.1.0")
+    let matches = Command::new("K-mer counter")
+        .version("0.1.2")
         .author("Claudia C. Weber <cw21@sanger.ac.uk>>")
         .about("Tally nucleotide counts in multi-entry fasta")
         .arg(
-            Arg::with_name("file")
-                .short("f")
+            Arg::new("file")
+                .short('f')
                 .long("file")
                 .takes_value(true)
                 .required(true)
                 .help("Fasta file to tally."),
         )
         .arg(
-            Arg::with_name("klength")
-                .short("k")
+            Arg::new("klength")
+                .short('k')
                 .long("klength")
                 .takes_value(true)
                 .default_value("4")
                 .help("K-mer length"),
         )
-        .arg(Arg::with_name("out")
-                 .short("o")
+        .arg(Arg::new("out")
+                 .short('o')
                  .long("out")
                  .takes_value(true)
-                 .required(true)
+                 .required(false)
                  .default_value("counter_output.npy")
                  .help("Output file name."))
-        .arg(Arg::with_name("ids")
-                 .short("i")
+        .arg(Arg::new("ids")
+                 .short('i')
                  .long("ids")
                  .takes_value(true)
-                 .required(true)
+                 .required(false)
                  .default_value("ids.txt")
                  .help("File to write identifiers to"))
-        .arg(Arg::with_name("collapse")
-                 .short("c")
+        .arg(Arg::new("collapse")
+                 .short('c')
                  .long("collapse")
                  .takes_value(true)
-                 .required(true)
+                 .required(false)
                  .default_value("1")
                  .help("Canonicalize k-mers (default 1 = True"))
         .get_matches();
@@ -144,12 +173,25 @@ fn main() -> Result<(), Box<dyn Error>> {
             let key_copy = key.clone();
             keys.push(key_copy);
         }
+
+    let _ncols = keys.len();
+    println!("Number of keys: {:#?}", _ncols);
+
     //Uncomment line below to print keys
     //println!("Retained keys: {:?}", keys);
 
-    let mut array = vec![];
+    let mut _nrows = 0;
+    let tmp_path = Temp::new_file()?;
+
+    {
+
+    //let mut tmp = File::create(&tmp_path)?;
+    let file = File::create(&tmp_path)?;
+    let mut file = BufWriter::new(file);
+    //let mut file = BufWriter::with_capacity(16384*4,file);
 
     while let Some(record) = reader.next() {
+        _nrows += 1;
         let mut k_counts_it = k_counts.clone();
 
         let seqrec = record.expect("invalid record");
@@ -168,13 +210,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 *k_counts_it.entry(kmer).or_insert(0) += 1;
             }
         }
-        let mut line = vec![];
+        //let mut line = vec![];
         for key in &keys {
-            line.push(k_counts_it[key]);
+            file.write_all(&k_counts_it[key].to_le_bytes())?;
+            //line.push(k_counts_it[key]);
         }
-        array.push(line);
-    }
-    let arr = vec_to_array(array);
-    write_npy(&out, &arr)?;
+
+    };
+    file.flush()?;
+    } 
+
+
+    write_header(_nrows, _ncols, out, tmp_path)?;
+
     Ok(())
 }
