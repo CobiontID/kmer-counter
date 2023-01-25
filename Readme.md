@@ -2,6 +2,8 @@
 
 This k-mer counter, based on [Needletail](https://github.com/onecodex/needletail)'s efficient FASTA parser is designed to tally k-mer counts for large sequencing read sets. It was written with downstream processing in TensorFlow or NumPy in mind, and stores the results in a [npy](https://numpy.org/devdocs/reference/generated/numpy.lib.format.html) file. The counter operates directly on bytes, saving overhead.
 
+For some examples of the counter in action, see https://cobiontid.github.io/
+
 ## Usage
 `kmer-counter --file <fasta file> --ids <output file for sequence ids> --klength <k-mer length, default 4> --out <output file> --collapse <canonicalize 0: False, 1: True; Default 1>`
 
