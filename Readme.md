@@ -43,3 +43,5 @@ A set of ~200 million HiFi reads from *Viscum album* (European mistletoe) was pr
 - Navigate to the directory containing Cargo.toml
 - Run `cargo build --release` . The resulting binary will be located in `./target/release/kmer-counter` unless otherwise specified.
 
+## Citation
+If you use the kmer counter in your work, please cite https://www.biorxiv.org/content/10.1101/2024.05.30.596622v1
