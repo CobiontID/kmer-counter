@@ -27,11 +27,11 @@ k = 4
 ["".join(i) for i in product("ACGT", repeat=k)]
 ```
 ### Notes
-Given the structure of the output and the hashmap used while counting, this tool is not intended for counting very large k-mers that are likely to produce a sparse count matrix. If you are interested in the number of distinct k-mers found in each sequence record, consider using [unique-kmer-counts](https://github.com/CobiontID/unique-kmer-counts) instead.
+Given the structure of the output and the hashmap used while counting, this tool is not intended for counting very large k-mers that are likely to produce a sparse count matrix. Each possible k-mer is assigned a slot, regardless of whether that k-mer is subsequently observed in the input data. If you are interested in the number of distinct k-mers found in each sequence record, consider using [unique-kmer-counts](https://github.com/CobiontID/unique-kmer-counts) instead.
 
 ## Requirements
 
-This program is suitable for processing large read sets on an ordinary computer. From v. 0.1.2, the required memory scales with the selected k-mer size, not the number of sequence records.
+This program is suitable for processing large read sets on an ordinary computer. From v. 0.1.2, the required memory scales with the selected k-mer size (4^k for the non-canonicalized case), not the number of sequence records.
 
 A set of ~200 million HiFi reads from *Viscum album* (European mistletoe) was processed in a single batch in ~30 hours with a peak memory use of 7MB (k = 4, canonicalized).
 
