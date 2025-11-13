@@ -9,7 +9,7 @@ COPY . .
 ENV CARGO_TARGET_DIR=/usr/local/kmer-counter
 
 RUN apt-get update && \
-    apt-get install -y musl-tools pkg-config libssl-dev && \
+    apt-get install -y musl-tools pkg-config libssl-dev procps && \
     rustup target add x86_64-unknown-linux-musl
 
 RUN rustup target add x86_64-unknown-linux-musl
