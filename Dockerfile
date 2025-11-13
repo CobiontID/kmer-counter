@@ -9,7 +9,7 @@ COPY . .
 ENV CARGO_TARGET_DIR=/usr/local/kmer-counter
 
 RUN apt-get update && \
-    apt-get install -y musl-tools pkg-config libssl-dev procps && \
+    apt-get install -y musl-tools pkg-config libssl-dev && \
     rustup target add x86_64-unknown-linux-musl
 
 RUN rustup target add x86_64-unknown-linux-musl
@@ -24,6 +24,7 @@ LABEL maintainer=dp24@sanger.ac.uk
 
 LABEL org.opencontainers.image.licenses="MIT"
 
-RUN echo $PWD
+RUN apt-get update && \
+    apt-get install -y procps
 
 COPY --from=build /usr/local/kmer-counter/x86_64-unknown-linux-musl/release/kmer-counter /usr/local/bin/kmer-counter
