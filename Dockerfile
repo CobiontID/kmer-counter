@@ -18,7 +18,7 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 
 # RUNNER
 
-FROM alpine:3.16.0 AS runtime
+FROM linuxcontainers/debian-slim:12.5 AS runtime
 
 LABEL maintainer=dp24@sanger.ac.uk
 
